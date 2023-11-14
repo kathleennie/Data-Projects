@@ -1,0 +1,189 @@
+---
+title: "Hw 4"
+author: "Kathleen Nie"
+date: '2022-10-29'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, error = TRUE)
+library(tidyr)
+library(ggplot2)
+```
+
+## Question 1
+
+### 1.1) 
+```{r}
+#' @title future value function
+#' @description calculate the future value of money with compound interest
+#' @param p principal of how much you start
+#' @param r annutal interest rate 
+#' @param n number of years
+#' @param k number of compounding periods per year
+#' @return future value (amount accumulated)
+
+future_value <- function(p=1, r=0.01, n=1, k=1) {
+  
+   return (p*(1+r/k)^(n*k))
+}
+
+
+```
+
+The Future Value formula is as follows: 
+$$
+\mathrm{FV}=\mathrm{P}\left(1+\frac{r}{k}\right)^{n k}
+$$
+### 1.2) 
+```{r}
+future_value(1000, 0.025, 3, 1)
+```
+
+At the end of 3 years, his money would be worth $1076.89 
+
+## Question 2
+
+### 2.1) 
+```{r}
+#' @title ordinary annuity function
+#' @description calculate the future value of an ordinary annuity 
+#' @param pmt periodic contribution made at the end of each period 
+#' @param r annutal interest rate 
+#' @param n number of years
+#' @param k number of compounding periods per year
+#' @return future value (amount accumulated)
+
+annuity <- function(pmt=1, r=0.01, n=1, k=1) {
+  
+  if (r == 0) {
+    return (pmt * n * k)
+  } else {
+    top = (1 + r/k)^(n*k) -1
+    bot = r/k
+    return (pmt * top / bot)
+  }
+   
+}
+```
+
+The Future Value formula for ordinary annuity is as follows: 
+$$
+\mathrm{FV}=\operatorname{PMT} \times \frac{\left(1+\frac{r}{k}\right)^{n k}-1}{r / k}
+$$
+
+### 2.2) 
+
+```{r}
+annuity(100, 0.05, 10, 12)
+
+```
+Mrs. Savingswood will have $15528.23 at the end of 10 years
+
+
+
+## Question 3
+
+## 3.1)
+
+```{r}
+year = c(0:10)
+amount <- rep(1000, 11)
+initial_investment = 1000
+
+for (i in 1:10) {
+  fv = future_value(initial_investment, 0.0755, i, 1)
+  a = annuity(720, 0.0755, i, 1)
+  amount[i+1] = fv + a
+}
+
+tbl <- data.frame(year, amount)
+tbl
+```
+
+## Question 4
+
+### 4.1) 
+
+```{r}
+initial_amount = 1000
+num_years = 10
+num_simulations = 50
+annual_return = 0.10
+annual_volatility = 0.18
+set.seed(12345)
+
+# initialize matrix to store outputs 
+balances = matrix(0, nrow = num_years+1, ncol = num_simulations)
+
+for (sim in 1:num_simulations) {
+  aux_balance = rep(initial_amount, num_years+1)
+  return_rates = rnorm(num_years, mean = annual_return, sd = annual_volatility)
+  for (year in 1:num_years) {
+    aux_balance[year + 1] = aux_balance[year] * (1 + return_rates[year]) + 360
+  }
+  balances[ ,sim] = aux_balance
+}
+
+rownames(balances) = 0:num_years
+colnames(balances) = paste0("sim", 1:num_simulations)
+
+balances = as.data.frame(balances)
+balances[,1:3]
+```
+
+### 4.2) 
+
+```{r}
+balances$year = 0:(nrow(balances)-1)
+
+data_reshape = pivot_longer(
+  balances , 
+  cols = starts_with("sim"),
+  names_to = "simulation", 
+  values_to = "amount")
+
+ggplot(data = data_reshape, aes(x = year, y = amount, group = simulation)) + 
+  geom_line() +
+  theme_minimal() + ggtitle("Simulations of 10 Year Investment Period") +
+  xlab("Years") + ylab("Balance ($)")
+```
+```{r}
+stocks = c(0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0)
+
+avg = c(0.0509, 0.054, 0.057, 0.06, 0.0629, 0.0657, 0.0684, 0.0711, 0.0737, 0.0762, 0.0787, 0.0811, 0.0834, 0.0856, 0.0878, 0.0899, 0.0919, 0.0938, 0.0957, 0.0974, 0.0991)
+
+stdv = c(0.0403, 0.0399, 0.0411, 0.0437, 0.0474, 0.0521, 0.0574, 0.0632, 0.0694, 0.0759, 0.0825, 0.0894, 0.0963, 0.1035, 0.1107, 0.1180, 0.1254, 0.1328, 0.1403, 0.1479, 0.1555)
+
+data = data.frame(stocks, avg, stdv)
+
+data[data['stocks'] == 0.40][2]
+
+```
+
+```{r}
+
+  
+balance = matrix(0, nrow = 10 + 1, ncol = 12)
+balance[1, ] = 1000
+set.seed(4)
+    
+for (sim in 1:12) {
+  return_rates = rnorm(10, mean = data[data['stocks'] == 0.4][2], sd = data[data['stocks'] == 0.4][3])
+    for (year in 1:10) {
+      
+      balance[year+1,sim] = (balance[year,sim] * (1 + return_rates[year])) + 360 
+      }
+    }
+    
+colnames(balance) = paste0("sim", 1:12)
+
+balance
+```
+```{r}
+percent = 65/100
+which(stocks == 0.45)
+stocks[13]
+0.45/0.05
+```
+

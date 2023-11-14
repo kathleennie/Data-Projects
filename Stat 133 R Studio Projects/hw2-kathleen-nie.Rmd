@@ -1,0 +1,180 @@
+---
+title: "HW2 Kathleen Nie"
+output: 
+  html_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Part A
+
+```{r warning=FALSE, include=FALSE}
+
+library(DataExplorer)
+library(tidyverse)# includes dplyr, ggplot2 and other pkgs
+library(lubridate)# for working with dates
+library(spData)
+library(ISLR)
+
+library(maps)     
+library(rnaturalearth)
+```
+
+```{r}
+
+col = c("character", 
+    "integer", 
+    "integer",   
+    "character",  
+    "character",   
+    "character",
+    "character",
+    "character",
+    "real",
+    "real",
+    "integer",
+    "integer",
+    "integer",
+    "character",
+    "integer",
+    "integer",
+    rep("NULL", 147))
+
+cols = c(rep("integer", 6), "double", "real", rep("character", 8), rep("NULL", 147))
+
+ourdata <- read.table(file = "C:/Users/kathl/Downloads/ibtracs.NA.list.v04r00.csv", sep = ",", colClasses = col, skip = 2, na.strings = c(" ", "hurdat_atl", "atcf", "hurdat_epa"))
+```
+
+```{r}
+colnames(ourdata) <- c("SID", "SEASON", "NUMBER", "BASIN", "SUBBASIN", "NAME", "ISO_TIME", "NATURE", "LAT", "LON", "WMO_WIND", "WMO_PRES", "WMO_AGENCY", "TRACK_TYPE", "DIST2LAND", "LANDFALL")
+
+
+```
+# Part B
+```{r}
+summary(ourdata)
+```
+
+```{r}
+correlation = subset(ourdata, select = -c(SID, NAME, ISO_TIME, WMO_WIND, WMO_PRES, LANDFALL) )
+plot_correlation(correlation, title = "Cross Correlation Plot")
+
+```
+
+# Part C
+
+```{r}
+
+data2012 = subset(ourdata, SEASON == 2012)
+
+```
+## C.1) 
+
+
+a) there were a total number of 19 depressions 
+```{r}
+
+summarise(group_by(filter(data2012, WMO_WIND < 33), SID))
+
+
+```
+
+b) there were a total of 19 named storms 
+```{r}
+nrow(summarise(group_by(data2012, NAME)))
+```
+
+c) 10 named hurricanes with their names displayed below
+
+```{r}
+summarise(group_by(filter(data2012, WMO_WIND > 64), NAME))
+```
+
+d) 2 major hurricanes with their names displayed below 
+
+```{r}
+summarise(group_by(filter(data2012, WMO_WIND > 96), NAME))
+```
+
+e) first system formed was Alberto on 5/19/2012
+```{r}
+temp <- arrange(filter(data2012, SEASON == 2012), ISO_TIME)
+slice(temp,1)
+```
+
+
+
+f) Last system dissipated was SANDY on 10/31/2012
+
+```{r}
+slice_tail(temp, n=1)
+```
+
+## C.2) 
+
+a) 
+```{r}
+head(select(arrange(data2012, desc(WMO_WIND)), NAME) , n=1)
+```
+b) 
+```{r}
+head(select(arrange(data2012, desc(WMO_WIND)), WMO_WIND) , n=1)
+```
+c) 
+
+```{r}
+head(arrange(select(subset(data2012, NAME == "TONY"), WMO_PRES), WMO_PRES), n = 1)
+```
+
+# C.3) 
+
+a) the historical average number of storms is about 6 per year. In 2012, we had 19 as calculated in C.1). The 2012 season is above-average
+```{r}
+nrow(summarise(group_by(ourdata, NAME)))/(2021-1970)
+```
+
+
+b)
+the historical average number of hurricanes is about 5. From C.1) we saw 2012 had 10 hurricanes. 2012 season was above-average
+```{r}
+nrow(summarise(group_by(filter(ourdata, WMO_WIND > 64), NAME))) /(2021-1970)
+
+```
+
+
+c) from C.2) we got our max wind speed as 100 in 2012. The historical average wind speed shown below is 115. The 2012 season was below average for wind speed
+
+```{r}
+maxes = summarise(group_by(filter(ourdata, SEASON < 2021), SEASON), max = max(WMO_WIND, na.rm = TRUE))
+mean(maxes$max)
+```
+
+## C.4) 
+
+a) Season Summary Map 
+```{r}
+world_map <- map_data("world")
+
+gg_world <- ggplot() + 
+  geom_polygon(data = world_map, 
+               aes(x = long, y = lat, group = group), 
+               fill = "gray95", colour = "gray70", size = 0.2) +
+  theme_bw() + ggtitle("Season Summary Map")
+
+gg_world +
+  geom_point(data = data2012,
+             aes(x = LON, y = LAT, color = NAME)) +
+xlim(c(-130, 0)) + 
+  ylim(c(0, 70))
+```
+
+
+
+
+b) 
+yes, 5 (if I didn't miscount)
+they're Isaac, Beryl, Sandy, Alberto, and Debby (if I'm not color blind)
+

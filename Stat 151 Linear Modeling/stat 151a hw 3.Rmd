@@ -1,0 +1,141 @@
+---
+title: "stat 151a hw 3"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+tinytex::install_tinytex()
+```
+
+## 6
+
+```{r cars}
+italian  = read.csv("C:/Users/kathl/Downloads/nyc.csv")
+y = italian$Price
+x1 = italian$Food
+x2 = italian$Decor
+x3 = italian$Service
+x4 = italian$East
+
+model = lm(y ~ x1 + x2 + x3 + x4, data = italian)
+summary(model)
+
+
+```
+y = -24.0238 + (1.53812)x1 + (1.910087)x2 - (0.002727)x3 + (2.068050)x4
+
+### b 
+Decor has the largest estimated affect on price as its coefficient is greater than x1 or x3. It is also the most statistically significant as its t value (8.802) is the greatest and also has the smallest p value as well. 
+
+### c 
+since our coefficient for x4 is positive and the dummy variable = 1 if the restaurant was east, this means that the price of the restaurant increases if it's east of Fifth avenue. As a result, we would want to choose a restaurant on the east side to maximize price.
+
+### d
+probably not, as according to the summary results, customer service variable doesn't seem to be statistically significant and is negatively correlated with price. This means that high quality service doesn't really have much of an effect on price, so setting a price premium based on service would not be ideal
+
+
+## 7
+
+```{r pressure}
+load("C:/Users/kathl/Downloads/windmills.RData")
+
+plot(windmills$RSpd, windmills$CSpd)
+```
+
+### a 
+a linear regression seems plausible for this data as there seems a strong correlation between CSpd and RSpd
+
+### b
+
+```{r}
+x = windmills$RSpd
+y = windmills$CSpd
+
+model2 = lm(y~ x)
+summary(model2)
+
+```
+### c
+```{r}
+interval = confint(model2, level = 0.95)
+interval
+
+lower = 2.8085070 + 0.7172188*7.4285
+upper = 3.4739577 + 0.7942479*7.4285
+
+c(lower, upper)
+
+newdata = data.frame(x=7.4285 )
+predict(model2, new=newdata, interval="pred", level = 0.95)
+```
+
+## 8 
+```{r}
+squid = read.csv("C:/Users/kathl/Downloads/squid.csv")
+y = squid$weight
+x1 = squid$rostral_length
+x2 = squid$wing_length
+x3 = squid$rostral2notch_length
+x4 = squid$notch2wing_length
+x5 = squid$width
+
+model3 = lm(y ~ x1+x2+x3+x4+x5)
+summary(model2)
+
+model3$coefficients
+
+```
+y = (1.999)x1 + (-3.675)x2 + (2.524)x3 + (5.158)x4 + (14.401)x5
+
+### b
+
+```{r}
+squid[22,]
+n = data.frame(x1=1.73, x2=1.67, x3=0.64, x4=1.14, x5=0.55, y=6.88)
+predict(model3, new=n, interval="conf", level=0.95)
+predict(model3, new=n, interval="pred", level=0.95)
+
+
+```
+mean confidence interval : (5.228794, 7.222972)
+
+
+prediction interval : (4.432, 8.019767)
+
+### c
+```{r}
+newmodel = lm(y~ x2 + x4 + x5)
+summary(newmodel)
+sepred = predict(newmodel,new = n, se.fit=TRUE)$se.fit
+
+se_sq = 0.6783^2
+se_sq
+
+sepred
+
+predict(newmodel, new=n, interval="conf", level=0.95)
+
+```
+Residual Standard Error Squared (Se^2) : 0.4601
+ 
+ 
+Standard Error of Prediction: 0.3645678
+
+
+95% confidence interval on mean response: (5.680048, 7.211905)
+
+### d
+I would choose the reduced model 'm' from part c) as the mean response confidence interval and residual standard error are smaller. Furthermore, the R^2 for reduced model 'm" is higher than the original which means that the 'm' model fits the data better than the 'M' model.  
+
+### e
+```{r}
+model_red = lm(y~ x4 + x5)
+anova(model_red, model3)
+
+```
+Since the p value = 0.5572, this means we fail to reject the null hypothesis that B_0, B_1, B_2 = 0. This means that it is justifiable to remove these three variables (corresponding to x1, x2, x3) from our regression model. 
+```{r}
+qt(0.975, df = 30)
+```
+

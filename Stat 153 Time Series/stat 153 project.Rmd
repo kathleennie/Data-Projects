@@ -1,0 +1,438 @@
+---
+title: "Stat 153 Project"
+author: "Kathleen Nie"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(include = FALSE)
+tinytex::install_tinytex()
+```
+```{r include=FALSE}
+library(dplyr)
+library(forecast)
+library(astsa)
+
+```
+
+# Executive Summary
+Stuff City Inc. is a (made-up) publicly traded company who specialize in home-improvement products and services. This data set includes the closing price of Stuff City from 2016 to 2020, which is primarily affected by the year and month. 
+
+# Exploratory Data Analysis
+Upon graphing the time series, there doesn't seem to be any strong seasonality or trend. After grouping the series by the year and month they're in and taking the mean of the respective closing prices, we observe both a yearly and monthly trend. If we take a closer look and decompose the time series and graph the decomposition, it's more clear that there is some type of trend, seasonality, and randomness component. This step was achieved using decompose(data) function. Observing the acf plot, there is large autocorrelation within our lag values and a geometric decay, which suggests we may have to difference the data. 
+```{r}
+stocks = read.csv('projectdata_stocks.csv')
+head(stocks, 10)
+```
+
+```{r}
+
+stocks$year = format(as.Date(stocks$Date, tryFormats = "%Y-%m-%d"), "%Y")
+stocks$month = format(as.Date(stocks$Date, tryFormats = "%Y-%m-%d"), "%m")
+stocks$day = format(as.Date(stocks$Date, tryFormats = "%Y-%m-%d"), "%d")
+stocks$weekday = weekdays(as.Date(stocks$Date, tryFormats = "%Y-%m-%d"))
+
+close <- ts(stocks$Close, frequency = 261, start = c(2016, 4))
+
+plot.ts(close, xlab = 'Year', ylab = 'Closing Price')
+
+yearlymean = aggregate(stocks, by=list(year=stocks$year), names.arg = c("2016", "2017", "2018", "2019", "2020"), FUN = "mean")
+barplot(yearlymean$Close, xlab = 'Year Since 2016', ylab = 'Average Closing Price', col = 'light blue', names.arg = c("2016", "2017", "2018", "2019", "2020"))
+
+monthlymean = aggregate(stocks, by=list(month=stocks$month), names.arg = c("Jan", "Feb", "Mar", "April", "May", "June", "July", "Aug", "Sept", "Oct", "Nov", "Dec"), FUN = "mean")
+
+barplot(monthlymean$Close, xlab = 'Months', ylab = 'Average Closing Price', col = 'pink', names.arg = c("Jan", "Feb", "Mar", "April", "May", "June", "July", "Aug", "Sept", "Oct", "Nov", "Dec"))
+
+
+
+acf(close, lag.max = 100)
+
+decomp <- decompose(close)
+plot(decomp)
+
+sper = TSA::periodogram(decomp$seasonal)
+fr <- which(sper$freq < 0.05)
+plot(x = sper$freq[fr], y = sper$spec[fr], type = 'h', xlab = 'Frequency', ylab = 'Seasonal Periodogram')
+```
+
+Looking at the decomposition graph, there seems to be an observed trend over the 4 years that looks kind of parametric. While the seasonality component does not seem to affect a huge amount of the data, it does have an affect of around plus or minus $1 on the closing price. Further observing the seasonality component, the seasonal periodogram plot seems to have three significant frequencies around 0.006, 0.011, and 0.027. These frequencies correspond to about 7, 13, and 31 days, suggesting there's some sort of weekly and monthly seasonality component. 
+
+
+# Models Considered
+To model the yearly trend within the data and its relatively random behavior, I will use both a parametric and differencing approach. In the parametric model, I will account for the trend (which is likely attributed by the closing price average per year and month), seasonality, and randomness seen in the decomposition. In the differencing model, I will explore the appropriate order differencing and lag. 
+
+
+## Parametric Model
+Looking at the periodogram, the frequency is strongest around 0.002. As a result, a sinusoid with period 365.25 is interacted with the year and month of the data. Accounting for a possible quadratic trend that was seen in the decomposition earlier, time squared is added. Additionally, indicators for each month and year are also included. To account for heteroscedasticity, the log of the original closing price with taken. This deterministic signal model is detailed below where$X_t$ is the additive noise term: 
+
+
+
+$${log(close)}_t = 
+\beta_0 + \beta_1 t +  \sum_{i = 1}^{12} \sum_{i = 1}^{4} \beta_{1+i+j} I_{\text{month}_{it}} I_{\text{year}_{jt}} sin\left(\frac{2\pi t}{365.25}\right) +
+
+\sum_{i = 1}^{12} \sum_{i = 1}^{4} + \beta_{50+i+j} I_{\text{month}_{it}} I_{\text{year}_{jt}} cos\left(\frac{2\pi t}{365.25}\right) + X_t$$ 
+
+
+```{r message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
+per = TSA::periodogram(close)
+```
+
+```{r warning=FALSE}
+
+x <- which(per$freq < 0.015)
+plot(x = per$freq[x], y = per$spec[x], type = 'h', xlab = 'Frequency', ylab = 'Periodogram')
+
+acf2(stocks$Close, max.lag = 30)
+
+
+X3 = stocks$X
+yr = stocks$year
+mth = stocks$month
+day = stocks$weekday
+
+mod1 = lm(log(stocks$Close) ~ X3 + cos(2*pi*X3*1/365.25)*mth*yr + sin(2*pi*X3*1/365.25)*mth*yr)
+
+plot(log(stocks$Close), x = stocks$X, type = 'l', xlab = 'Time', ylab = 'Log Closing Price', main = 'Parametric Fitted Model')
+lines(mod1$fitted.values, col = 'purple')
+plot(mod1$residuals, x = stocks$X, type = 'l', ylab = 'Residuals', xlab = 'Time', main = 'Parametric Model Residuals')
+
+summary(mod1)
+
+
+```
+Looking at the residuals, the plot looks mostly stationary except towards the end. In the corresponding position of the original graph, there is a huge unexpected closing price drop at that time index. Since such a drop only occurs once in this data set, it will be treated as an outlier so it does not largely affect our prediction model. 
+
+## Parametric Model with ARMA(1, 2)
+
+To start off, the auto.arim is used to create a rough starting point. 
+
+Using the suggestions from auto.arima, the plot below shows the results of fitting an ARMA(1, 2). The ACF and PACF plot shows that improvements can still be made as there are still a good number of significant values sticking out in both plots. 
+```{r}
+auto.arima(mod1$residuals)
+
+arima2 = Arima(mod1$residuals, order = c(1, 0, 2))
+
+```
+
+
+```{r}
+arima2$aic
+arima2$aicc
+arima2$bic
+```
+
+
+## Parametric Model ARMA(3,3)x(0,1)[7]
+
+For a better idea on how to determine our p, q, P, Q values, below is a acf2 plot of the parametric model residuals
+
+```{r}
+acf2(mod1$residuals)
+
+```
+
+Observing the acf2 plot of the parametric model residuals, the acf seems to cut off after around lag 7 while the pacf does not have a clear cut off. This suggests a sarima model with S = 7 and Q > 0. This information is used in combination with the previous auto.arima suggestion as a starting point to test out various sarima models. The model below produced the best IC values, all of which are lower value than the previous auto.arima model. 
+
+
+```{r}
+arima1 = arima1 = Arima(mod1$residuals, order = c(3, 0, 3), seasonal = list(order = c(0, 0, 1), period = 7))
+```
+
+
+```{r}
+arima1$aic
+arima1$aicc
+arima1$bic
+```
+
+
+## Differencing Model 
+
+To account for possible monthly seasonal trends, I will take the second order difference of lag 1 and lag 7. Differencing by lag 1 removes deterministic trend and differencing by lag 7 removes any weekly seasonality trend. The reason these lags were chosen as they show significant values in the acf plot. In the second figure, the black lines show the logarithmic values of the original closing price data while pink lines show the fitted values of our model. The log was taken before creating the model to account for heterscedasticity in the residuals.In the last figure, I have the equivalent of our residual plot, which is also the second order difference at lag 1 and 7. Overall, the residual plot looks relatively stationary. However, the variance towards the end increases as the original time series data hold more outliers/drastic changes. Since our model fits the majority of our data pretty well, the increased variance can be set aside for the moment. 
+
+```{r}
+diff1 = diff(stocks$Close, lag = 1)
+acf(diff1, main = "First Order Differencing")
+diff2 = diff(diff1, lag = 7)
+acf(diff2)
+
+
+
+stocks$diffmodel = NA
+for (i in 9:nrow(stocks)) {
+  stocks$diffmodel[i] = mean(diff2) + stocks$Close[i-1] + stocks$Close[i-5] - stocks$Close[i-5-1]
+} 
+
+
+plot(close, x = stocks$X, type = 'l', xlab = 'Time', ylab = 'Closing Price', main = 'Differencing Fitted Values', lwd = 2 )
+lines(stocks$X, stocks$diffmodel, col='pink')
+
+Noise = diff2
+plot.ts(Noise, main = expression(paste(Delta[1], Delta[7], "Close"[t])))
+
+
+```
+## Differencing with ARMA(2, 1)x(0,2)[7]
+
+In the acf2 plot below of our above second difference data at lag 1 and lag 7,
+we can observe a significant value in the acf graph at lag 7 and possibly at lag 14, suggesting Q = 2. There's also some smaller consistent spikes suggesting that p > 0. In our pacf graph, there seems to be a tapering off pattern also occuring at multiples of lag, which indicates that Q > 0. 
+
+```{r}
+acf2(diff2)
+
+diffsar = Arima(diff2, order = c(2, 0, 1), seasonal = list(order = c(0, 0, 2), period = 7))
+
+diffsar$aic
+diffsar$aicc
+diffsar$bic
+
+```
+## Differencing with ARMA(0, 1)x(0,2)[7]
+
+To help improve the previous model, perhaps the smaller spiked values in the acf plot aren't significant so in this model, p = 0 rather than 2. As illustrated in the AIC, this model fits slightly better than the one above. 
+```{r}
+diffsar2 = Arima(diff2, order = c(0, 0, 1), seasonal = list(order = c(0, 0, 2), period = 7))
+
+diffsar2$aic
+diffsar2$aicc
+diffsar2$bic
+```
+## Model Comparison and Selection
+
+Comparing the AIC values of the two parametric models, the parametric model + ARMA(3,3)x(0,1)[7] shows the lowest AIC value. Comparing AIC values for the two differencing models, the differencing + ARAMA(0,1)x(0,2)[7] has the lowest AIC value and the best Ljung Box statistics p-values. 
+
+
+
+
+```{r}
+a = matrix(c(-5.86584, -6.267744, 0.9120, 0.9111), nrow=4,ncol = 1)
+colnames(a) = "AIC Values"
+rownames(a) = c(
+        "Parametric Model + ARMA(1,2)",
+        "Parametric Model + ARMA(3,3)x(0,1)[7]",
+        "Second Order Differencing + ARMA(2, 1)x(0,2)[7]",
+        "Second Order Differencing + ARMA(0, 1)x(0,2)[7]"
+        )
+knitr::kable(a,caption = "AIC values for the four models under consideration.")
+```
+
+The four models are also compared through time series cross validation. This cross validation rolls through the last 190 days in the data in 10 day segments. The root-mean-square prediction error, RMSPE, is used to determine which model produces the best fit. 
+```{r include=FALSE}
+# Initialize sum_squared_errors
+sum_squared_errors <- c("model1.1"=0, "model1.2"=0, "model2.1"=0, "model2.2"=0)
+
+# Loop through the dataset
+for (i in 19:1) {
+  
+  training <- stocks[1:(nrow(stocks) - 10*i),]
+  test <- stocks[(nrow(stocks) - 10*i + 1):(nrow(stocks) - 10*(i-1)),]
+  
+  N = nrow(training)
+
+  # Convert year to numeric
+  training$year = as.numeric(format(as.Date(training$Date, tryFormats = "%Y-%m-%d"), "%Y"))
+  training$month = format(as.Date(training$Date, tryFormats = "%Y-%m-%d"), "%m")
+  
+  test$year = as.numeric(format(as.Date(test$Date, tryFormats = "%Y-%m-%d"), "%Y"))
+  test$month = format(as.Date(test$Date, tryFormats = "%Y-%m-%d"), "%m")
+  
+  newX = training$X
+  newmth = training$month
+  newyr = training$year
+  
+  signal1 = lm(log(training$Close) ~ newX + cos(2*pi*newX*1/365.25)*newmth*newyr +  sin(2*pi*newX*1/365.25)*newmth*newyr, data = training)
+  
+  new.df <- data.frame(newX = c(test$X), newmth = c(test$month), newyr = c(test$year))
+  signal.forecast1 = predict(signal1, newdata = new.df)
+  
+  noise.forecast1.1 = sarima.for(signal1$residuals, n.ahead=10, p=1,d=0,q=2)$pred
+  noise.forecast1.2 = sarima.for(signal1$residuals, n.ahead=10, p=3,d=0,q=3, P = 0, D = 0, Q = 1, S = 7)$pred
+
+  forecast1.1 = numeric(10)
+  forecast1.2 = numeric(10)
+  
+  forecast1.1 = numeric(10)
+  forecast1.2 = numeric(10)
+  
+for (j in 1:10) {
+    forecast1.1[j] = signal.forecast1[j] + noise.forecast1.1[j]
+    forecast1.2[j] = signal.forecast1[j] + noise.forecast1.2[j]
+  }
+  
+  
+#differencing model 
+
+difftr1 = diff(training$Close)
+difftr2 = diff(difftr1, lag = 7)
+
+noise.forecast2.1 = sarima.for(difftr2,n.ahead=10,p=2,d=0,q=1,P=1,D=0,Q=2,S=5)$pred
+noise.forecast2.2 = sarima.for(difftr2,n.ahead=10,p=0,d=0,q=1,S=5,Q=2)$pred
+
+forecast2.1 = numeric(10)
+forecast2.2 = numeric(10)
+
+
+forecast2.1[1] = noise.forecast2.1[1] + mean(difftr2) + training$Close[N+1-5]
+                          + training$Close[N + 1 - 1] - training$Close[N+1-5-1]
+
+forecast2.2[1] = noise.forecast2.2[1] + mean(difftr2) + training$Close[N+1-5]
+                          + training$Close[N + 1 - 1] - training$Close[N+1-5-1]
+
+for (i in 2:5) {
+  forecast2.1[i] = noise.forecast2.1[i] + mean(difftr2) + training$Close[N+i-5]
+                          + forecast2.1[i-1] - training$Close[N+i-5-1]
+  forecast2.2[i] = noise.forecast2.2[i] + mean(difftr2) + training$Close[N+i-5]
+                          + forecast2.2[i-1] - training$Close[N+i-5-1]
+}
+
+
+forecast2.1[6] = noise.forecast2.1[8] + mean(difftr2) + forecast2.1[6-5]
+                          + forecast2.1[8-1] - training$Close[N+6-5-1]
+forecast2.2[6] = noise.forecast2.2[8] + mean(difftr2) + forecast2.1[6-5]
+                          + forecast2.2[8-1] - training$Close[N+6-5-1]
+
+for (i in 7:10) {
+  
+  forecast2.1[i] = noise.forecast2.1[i] + mean(difftr2) + forecast2.1[i-5]
+                          + forecast2.1[i-1] - forecast2.1[i-5-1]
+  forecast2.2[i] = noise.forecast2.2[i] + mean(difftr2) + forecast2.2[i-5]
+                          + forecast2.2[i-1] - forecast2.2[i-5-1]
+
+}
+
+  
+  
+  sum_squared_errors["model1.1"] = sum_squared_errors["model1.1"] + sum((forecast1.1 - test$Close)^2)
+  sum_squared_errors["model1.2"] = sum_squared_errors["model1.2"] + sum((forecast1.2 - test$Close)^2)
+  sum_squared_errors["model2.1"] = sum_squared_errors["model2.1"] + sum((forecast2.1 - test$Close)^2)
+  sum_squared_errors["model2.2"] = sum_squared_errors["model2.2"] + sum((forecast2.2 - test$Close)^2)
+  
+}
+
+```
+
+
+
+
+The table below shows that the differencing with ARMA(0,1)x(0,2)[7] noise is the best overall according to this cross-validation exercise, and therefore this model will be used for forecasting. 
+
+```{r}
+
+
+
+a = matrix(c(6.674419, 6.674237, 2.243087, 2.23168), nrow=4,ncol = 1)
+colnames(a) = "RMSPE"
+rownames(a) = c(
+        "Parametric Model + ARMA(1,2)",
+        "Parametric Model + ARMA(3,3)x(0,1)[7]",
+        "Second Order Differencing + ARMA(2, 1)x(0,2)[7]",
+        "Second Order Differencing + ARMA(0, 1)x(0,2)[7]"
+        )
+knitr::kable(a,caption = "Cross-validated out-of-sample root mean squared prediction error for the four models under consideration.")
+
+```
+
+
+```{r}
+forecast2.2[4]
+```
+
+
+
+# Results
+
+Math equation of model 
+$$Y_t = Y_{t-1} + Y_{t-7} - Y_{t-1-7} + X_t + E(X_t)$$
+
+
+ARMA model equation 
+
+
+$$X_t = W_t + \theta W_{t-1} + \Theta_1 W_{t-7} + \Theta_2 W_{t-14}$$
+
+## Estimation of model parameters
+
+
+
+
+
+```{r include=FALSE}
+diffsar2$ttable
+diffsar2$fit
+
+mean(diff2)
+
+```
+
+## Forecasting
+
+the figure below shows the next ten forecast weekday closing prices starting from Monday 9/21. 
+
+```{r}
+forecastnoise = sarima.for(Noise,n.ahead=10,p=2,d=0,q=1,S=5, P = 1, Q=2)$pred
+
+N = nrow(stocks)
+
+forecastfinal = numeric(10)
+
+forecastfinal[1] =  forecastnoise[1]+ stocks$Close[N+1-5] + 
+                      stocks$Close[N + 1 - 1] - stocks$Close[N+1-5-1] + mean(Noise)
+
+for (i in 2:5) {
+  forecastfinal[i] = forecastnoise[i]+stocks$Close[N+i-5] + 
+                      forecastfinal[i - 1] - stocks$Close[N+i-5-1] + mean(Noise)
+}
+
+
+forecastfinal[6] =  forecastnoise[7]+forecastfinal[7-5]
+                          + forecastfinal[7-1] - stocks$Close[N+7-5-1] + mean(Noise)
+
+
+for (i in 7:10) {
+  forecastfinal[i] = forecastnoise[i]+ forecastfinal[i-5]
+                          + forecastfinal[i-1] - forecastfinal[i-5-1] + mean(Noise)
+
+}
+
+final = c(stocks$Close, forecastfinal)
+
+finalX = c(stocks$X, 1188, 1189, 1190, 1191, 1192, 1193, 1194, 1195, 1196, 1197)
+
+finalX2 <- ts(final, frequency = 261, start = c(2016, 4))
+
+
+plot.ts(final, type = 'l', xlab = 'Time', ylab = 'Closing Price', main = 'Original Time Series with Forecasted Values', xlim = c(1150, 1200), ylim = c(26, 30.5))
+
+lines(c(seq(1188, 1197)), forecastfinal, col = 'red')
+
+points(c(seq(1188, 1197)), forecastfinal, col = 'red')
+points(c(seq(1150, 1187)), stocks$Close[1150:1187])
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+Thus, our forecasted value =  predicted Parametric + predicted 
+SARIMA(p=3, d=0, q=3, P=0, D=0, Q=1, S=7). To calculate the predicted parametric trend value, the predict() is used. To forecast the ARMA model, the sarima.for() function is used. As our p, q, P, Q values are small, only 5 fore casted data points are calculate for accuracy. If say a larger number of data points are forecasted, the predicted values will converge closer and closer to the mean of our stocks closing price data. The first graph shows forecasted sarima values, while the second shows forecasted log of the stock's closing price. 
+
+```{r eval=FALSE, include=FALSE}
+write.table(x = forecastfinal,file = "~/Desktop/Stat 153/stocks_3034857762.csv", sep=",",row.names=FALSE, col.names=FALSE)
+```
+
+
+```{r}
+forecastfinal
+
+```
+
+

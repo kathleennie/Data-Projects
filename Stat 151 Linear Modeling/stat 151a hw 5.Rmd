@@ -1,0 +1,147 @@
+---
+title: "Stat 151A Hw 5"
+author: "Kathleen Nie"
+date: "4/15/2021"
+output: pdf_document
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+```{r}
+library(pls)
+library(glmnet)
+library(leaps)
+library(lmvar)
+library(SignifReg)
+```
+
+
+```{r}
+ind <-read.csv("C:/Users/kathl/Downloads/BuffetIndicatorProjection.csv")
+colnames(ind) <- c("DATE", "GDP", "WILL5000", "MARKETCAP", "PROJECTED_BUFF_IND")
+ind
+
+
+vix <- read.csv("C:/Users/kathl/Downloads/VIXCLS.csv")
+vix1 <- ts(vix[2])
+
+treasury <- read.csv("C:/Users/kathl/Downloads/DGS10 (4).csv")
+treasury1 <- ts(treasury[2])
+
+effr <- read.csv("C:/Users/kathl/Downloads/EFFR.csv")
+effr1 <- ts(effr[2])
+
+
+equityuncert <- read.csv("C:/Users/kathl/Downloads/WLEMUINDXD.csv")
+equityuncert1 <- ts(equityuncert[2])
+
+
+tedrate <- read.csv("C:/Users/kathl/Downloads/TEDRATE.csv")
+tedrate1 <- ts(tedrate[2])
+
+infl <-  read.csv("C:/Users/kathl/Downloads/T10YIE.csv")
+infl1 <- ts(infl[2])
+
+infl1
+
+```
+```{r}
+semi = merge(vix, ind, by.x = "DATE", by.y = "DATE" )
+semi2 = merge(semi, equityuncert, by.x = "DATE", by.y = "DATE")
+semi2
+
+equityuncert1 <- ts(semi2[7])
+ind1 <- ts(semi2[6])
+```
+
+
+
+
+```{r}
+listind = ts(ind[5])
+listind
+```
+
+
+
+
+```{r}
+install.packages('aTSA')
+library("aTSA")
+```
+
+```{r}
+plot.ts(ind1)
+adf.test(diff(ind1))
+plot(diff(ind1))
+```
+
+
+```{r}
+
+```
+```{r}
+buffet_indicator = diff(ind1)
+equity_economic_uncertainty = diff(equityuncert1)
+cboe_vix = diff(vix1)
+effr = diff(effr1)
+TED = diff(tedrate1)
+treasury_10 = diff(treasury1)
+inflation_10 = diff(infl1)
+
+
+model2 = dynlm(buffet_indicator ~ equity_economic_uncertainty + cboe_vix + effr + TED + treasury_10 + inflation_10)
+summary(model2)
+```
+
+
+```{r}
+plot.ts(equity_economic_uncertainty)
+plot.ts(treasury_10)
+plot.ts(treasury1)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+install.packages('olsrr')
+library(olsrr)
+install.packages('MASS')
+library('MASS')
+install.packages('dynlm')
+library('dynlm')
+install.packages('ExtremeBounds')
+library('ExtremeBounds')
+
+```
+```{r}
+stepAIC(model2, direction = "back")
+```
+```{r}
+library(data.table)
+data = data.table(buffet_indicator, equity_economic_uncertainty, cboe_vix, effr, TED, inflation_10, treasury_10)
+colnames(data) <- c('buffet_indicator', 'equity_economic_uncertainty', 'cboe_vix', 'effr', 'TED', 'inflation_10', 'treasury_10')
+data
+```
+
+```{r}
+a =eba(formula = buffet_indicator ~ equity_economic_uncertainty + cboe_vix + effr + TED + treasury_10 + inflation_10, data = data)
+summary(a)
+```
+```{r}
+adf.test(diff(vix1))
+```
+

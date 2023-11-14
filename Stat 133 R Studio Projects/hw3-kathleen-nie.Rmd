@@ -1,0 +1,133 @@
+---
+title: "hw3-kathleen-nie"
+author: "Kathleen Nie"
+date: '2022-10-15'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(ggplot2)
+```
+
+# 1)
+
+### a)
+
+```{r out.width='85%', fig.align = 'center'}
+knitr::include_graphics("C:/Users/kathl/Downloads/Screenshot 2022-10-14 182715.png")
+```
+
+### b) 
+https://projects.fivethirtyeight.com/2022-election-forecast/senate/?cid=rrpromo 
+
+Design: Ryan Best, Elena Mejia
+Authors: Ryan Best, Jay Boice, Aaron Bycoffe, Christopher Groskopf, Elena Mejia
+
+### c)
+
+the diagram represents simulated bootstrapped data based on their model predicting how many Senate seats they expect each party to win. Each bar on the histogram represents a possible breakdown of seats in the Senate
+
+The associated time period is right now because the simulated data are based off of data collected recently
+
+The type of graphic is histogram
+
+### d) 
+
+There's a red vs blue color scheme in correspondance with colors of the republican and democratic parties
+
+### e) 
+
+graphic is maximizing the data-ink ratio because there's only colors where data is being represented
+
+### f)
+
+The visual appearance is interesting because the colors are split down the middle of a histogram centered around the average. Histograms are typically shown with one color and the number line usually goes in one direction. This infographic however has the bottom number line mirroring each other which is why it took me a while to understand what it was trying to portray. 
+
+# 2)
+
+### 1)
+
+The data-ink ratio is pretty good in my opinion. The overall simplicity + clarity portrays the important information well. The darker bars behind the brighter colored ones are a little big hard to see. The y-axis isn't as clearly labeled in my opinion and could benefit from more context. Furthermore, it's harder to see the smaller categories and the amount of time dedicated to them because 1) colors are similar and 2) the bars aren't big enough. 
+
+### 2) 
+```{r fig.width = 8, fig.height= 3}
+Days <- c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
+Social <- c(107,100,46,88,117,69,98)
+Entertainment <- c(29,22,32,14,0,1,0)
+Creativity <- c(1,3,8,1,1,1,9)
+Other <- c(101,22,69,44,72,39,46)
+
+Hours <- c(Social, Entertainment, Creativity, Other)
+Category <- c(rep("Social", 7), rep("Entertainment", 7), rep("Creativity", 7), rep("Other", 7))
+Day <- c(rep(Days, 4))
+
+df <- data.frame(Day, Category, Hours)
+df
+
+average = sum(df$Hours)/7
+df$Day <- factor(df$Day, levels = Days)
+
+ggplot(df, aes(x = Day, y = Hours, fill = Category)) + 
+  geom_bar(stat = "identity") + 
+  scale_fill_manual(values=c('pink', 'coral', 'cyan', 'deepskyblue')) + theme_dark() +
+  geom_abline(slope=0, intercept=average,  col = "green",lty=2)
+
+
+
+```
+
+### 3)
+```{r}
+ggplot(df, aes(x = Day, y = Hours, fill = Category)) + 
+  geom_bar(stat = "identity") + geom_abline(slope=0, intercept=average,  col = "black",lty=2)
+```
+This new and improved graphic is better because 1) it's not nearly as wide as the one provided by apple so I can actually see the make up of my bars better. You can also better compare the average (as shown by dotted black line) because there's more height in the graph. It also uses more contrasting colors and is not put against such a dark background for greater clarity between the screen time categories. 
+
+# 3)
+
+```{r}
+games = read.csv(
+file = "C:/Users/kathl/Downloads/cal-women-basketball-21-22.csv",
+stringsAsFactors = FALSE,
+colClasses = c(
+"numeric", # Game
+"character", # Opponent
+"character", # Home_Away
+"Date", # Date
+"numeric", # Cal_Score
+"numeric", # Opp_Score,
+"numeric", # FG_attempted,
+"numeric", # FG_made,
+"numeric", # FG3_attempted,
+"numeric" # FG3_made,
+))
+
+```
+
+```{r}
+Home_Away = rep(games$Home_Away, 4) 
+FG_Attempted = games$FG_attempted - games$FG_made
+FG_Made = games$FG_made
+
+FG3_Attempted = games$FG3_attempted - games$FG3_made
+FG3_Made = games$FG3_made
+
+Counts = c(FG_Attempted, FG_Made, FG3_Attempted, FG3_Made)
+
+Type = c(rep("FG", 24), rep("FG", 24), rep("FG3", 24), rep("FG3", 24))
+Attempted_Made = c(rep("Attempted", 24), rep("Made", 24), rep("Attempted", 24), rep("Made", 24))
+
+dt <- data.frame(Home_Away, Type, Counts, Attempted_Made)
+
+ggplot(dt, aes(x = Type, y = Counts, fill = Attempted_Made)) + 
+  geom_bar(stat = 'identity', position = 'stack') + facet_grid(~Home_Away) + labs(title = "Home vs Away Game Shot Count by Field Goal Type", xlab = "Field Goal Type", ylab ="Counts", fill = "Attempted or Made")
+
+
+```
+
+
+In the stacked grouped bar chart, I first compare away vs home game data. Within all away or home games, I then divide the data further into whether that attempt would have been a field goal or a 3 pointer. Lastly, I show the number of shots attempted but not made vs the number of shots made for that specific field goal, making the count number of all shots the total height of the bar. I then showcase the results side by side to see if there's a difference between away and home games proportions. As can be seen, the womens' basketball team are on away games more often than home games, but the proportion of attempted vs successful shots seem to be similar. It seems for both away and home games, they have higher success rate for normal field goals than 3 pointers. 

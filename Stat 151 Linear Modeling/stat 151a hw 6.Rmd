@@ -1,0 +1,177 @@
+---
+title: "Stat 151A Hw 6"
+author: "Kathleen Nie"
+date: "4/30/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## 4) 
+```{r}
+library("ISLR")
+library(magrittr)
+library(dplyr)
+library(MASS)
+```
+
+```{r}
+
+
+data <- Smarket[-c(1, 7,8,9)]
+variables = as.matrix(data) 
+direction = Smarket$Direction
+
+
+
+a = direction == "Up"
+y = sapply(a, as.numeric)
+y = as.matrix(y)
+
+  
+```
+
+```{r echo=TRUE}
+
+compute_p <- function(x,beta){
+  X <- cbind(1,x)
+  p <- exp(X%*%beta)/(1+exp(X%*%beta)) 
+  return(p)
+}
+
+compute_var <- function(p){
+  W <- p*(1-p) 
+  return(diag(as.vector(W)))
+}
+
+compute_var_vector <- function(p) {
+  W <- p*(1-p)
+  return(W)
+}
+
+compute_expected_resp <- function(x,beta,y,p,W){
+  X <- cbind(1,x)
+  z <- X%*%beta+(y-p)/W 
+  return(z)
+}
+
+b_new <- function(X, W, z) {
+  lhs <- t(X)%*%W%*%X
+  rhs <- t(X)%*%W%*%z
+  return(solve(lhs)%*%rhs)
+}
+
+did_we_converge <- function(beta0,beta1,conv.eps){
+  sum((beta0-beta1)^2)<=conv.eps
+}
+
+
+
+
+IRLS <- function(X,y,max.iter=100,conv.eps=1e-12){
+  beta <- rep(0,ncol(cbind(1,X))) 
+  beta_prev <- beta     
+  
+
+  
+  for(iter in 1:max.iter){
+    p <- compute_p(X,beta) 
+    w <- compute_var(p) 
+    w2 <- compute_var_vector(p)
+    z <- compute_expected_resp(X,beta,y,p,w2)
+    
+    
+    beta <- b_new(X,w,z)
+    
+    if(sum((beta-beta_prev)^2)<=conv.eps){
+      break
+    } else {
+      beta_prev <- beta
+    }
+  }
+  
+  return(beta)
+}
+```
+
+## 5) 
+
+
+```{r}
+IRLS <- function(X,y,max.iter=100,conv.eps=1e-12){
+  beta <- rep(0,ncol(cbind(1,X))) 
+  beta_prev <- beta               #
+  
+  for(iter in 1:max.iter){
+    p <- compute_p(X,beta) 
+    
+    x <- cbind(1,X)
+    
+    x_bar = x%*%t(p)
+    
+    beta = beta_prev + (t(x)%*%x_bar)^-1 %*% (t(x)%*%(y-p))
+  
+    
+    if(sum((beta-beta_prev)^2)<=conv.eps){
+      break
+    } else {
+      beta_prev <- beta
+    }
+  }
+  
+  return(beta)
+}
+  
+```
+
+
+
+
+## 6)
+
+```{r}
+library(MASS)
+
+summary(birthwt)
+
+birthwt2 <- birthwt%>%
+  rename(hypertension = ht)%>%
+  mutate(race = ifelse(race == 1, "white", "non-white"))
+head(birthwt2)
+
+m0 <- glm(low ~ race, family = binomial, data = birthwt2)
+summary(m0)
+
+```
+first looking at whether a child born below normal birth weight is affected by race. From results, being white had negative effect on whether the child was below normal birth weight (-0.6954) compared to other races. Looking at the p0value, the results are statistically significant
+
+
+
+```{r}
+m1 <- glm(low ~ race + smoke, family = binomial, data = birthwt2)
+summary(m1)
+```
+In this model, the variable smoke was taken into consideration. Mothers who smoked during pregnancy had a higher chance (1.1130) of giving birth to a baby that would be below normal birth weight of 2.5 kg. the p-value shows that this result is significant
+
+```{r}
+m2 <- glm(low ~ race + smoke + hypertension, family = binomial, data = birthwt2)
+summary(m2)
+```
+ In this model we see that hypertension does increase the likelihood that a child's birth weight will be below 2.5 kg (1.175). This indicator however is not statistically significant with a p-value of >.05.
+
+```{r}
+m3 <- glm(low ~ race + smoke * hypertension, family = binomial, data = birthwt2)
+summary(m3)
+```
+lastly, we examine the interaction between smoking and hypertention together. The model shows that people of white race are more likely to have a child that is of normal birth weight or higher. It also shows that smoking have a negative effect. There is however no correlation between hypertension and lower birth weight. =
+
+
+
+```{r}
+anova(m0, m1, m2, m3, test = "Chisq")
+```
+
+Model 4 seems to have the best fit 

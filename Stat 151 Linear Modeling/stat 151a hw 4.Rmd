@@ -1,0 +1,260 @@
+---
+title: "Stat 151A Hw 4"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+r = getOption("repos")
+r["CRAN"] = "http://cran.us.r-project.org"
+options(repos = r)
+install.packages('faraway', dependencies = TRUE)
+install.packages('car', depndencies = TRUE)
+```
+
+
+```{r cars}
+forest  = read.csv("C:/Users/kathl/Downloads/forestry.csv")
+forest
+```
+
+## 2) 
+```{r}
+## 2.1) 
+x1 = forest$HD
+x2 = forest$AGE
+x3 = x1/forest$N
+y = forest$MDBH
+
+reg = lm(y~x1+x2+x3)
+summary(reg)
+```
+y = 3.25145 + 0.06338(x1) - 0.13433(x2) + 29.99174(x3) + 0.2944
+
+R-squared = 0.8665
+86.65% of the data is fit in the regression model and thus only 86.65% of the variability is explained by the model
+
+
+```{r}
+## 2.2) 
+summary(lm(y~x3))
+```
+Null is rejected as p-value is very close to 0. 
+
+```{r}
+## 2.3)
+reg$fitted.values[5]
+pr = predict(reg, new=forest, se.fit = TRUE)
+pr$se.fit[5]
+
+predict(reg, new = forest, interval = "conf")
+
+```
+a) the corresponding fitted value is 6.226546
+b) standard error of prediction is 0.1168474
+c) 95% confidence interval is (5.979, 6.474)
+
+```{r}
+## 2.4) 
+hatvalues(reg)
+
+```
+
+```{r}
+cooks.distance(reg)
+```
+
+```{r}
+dfbetas(reg)
+2/(20)^0.5
+```
+Based off the results, it seems that the 20th data point has a greater influence on the results compared to the rest
+
+## 3)
+
+```{r}
+y = c(6.5, 5.9, 8.0, 9, 10, 10.5)
+x1 = c(9, 5.5, 9, 9.8, 14.5, 8.0)
+x2 = c(10, 9, 12, 11, 12, 14)
+x3 = c(4, 7, 5, 6.2, 5.8, 3.9)
+
+reg2 = lm(y ~ x1 + x2 + x3)
+
+## a) 
+summary(reg2)
+
+## b)
+b0_var = (-6.97)^2
+b1_var = (0.1722)^2
+b2_var = (1.10146)^2
+b3_var = (0.4113)^2
+
+b0_var
+b1_var
+b2_var
+b3_var
+
+## c) 
+redreg2 = lm(y ~ x3)
+anova(redreg2, reg2)
+
+```
+for part c, the full model would include all the parameters where the reduced model only include b_3. Using anova(reduced, full) where reduced is redreg2 and full is reg as seen in the code above. This obtanced a p-value of 0.689 which is > 0.05. Thus we fail to reject that null hypothesis and can justify removing parameters b_0, b_1, and b_2. 
+
+## 4) 
+
+```{r}
+x1 = c(10, 10, 20,20)
+x2 = c(1,2,1,2)
+X <- as.matrix(cbind(1, c(x1,x2)))
+
+## a) 
+H <- X %*% solve(t(X) %*% X) %*% t(X)
+diag(H)
+
+## b)
+x1 = c(-5, -5, 5, 5)
+x2 = c(-.5,.5,-.5,.5)
+X <- as.matrix(cbind(1, c(x1,x2)))
+H <- X %*% solve(t(X) %*% X) %*% t(X)
+diag(H)
+
+## c)
+x1 = c(-5/5, -5/5, 5/5, 5/5)
+x2 = c(-.5/0.5,.5/0.5,-.5/0.5,.5/0.5)
+X <- as.matrix(cbind(1, c(x1,x2)))
+H <- X %*% solve(t(X) %*% X) %*% t(X)
+diag(H)
+
+```
+for part d, centering and scaling made the HAT values the same for the data points. This essentially means centering and scaling made it so that the data points all had the same amount of influence over the predicted value. 
+
+## 5) 
+```{r}
+lmod <-lm(mpg~ I(hp^2)+qsec+wt, data = mtcars)
+op <-par(mfrow =c(2,2), mar =c(5, 4.1, 1.5, 2))
+plot(lmod)
+par(op)
+summary(lmod)
+
+```
+Residuals vs Fitted: 
+a graph of the residuals vs the regression fitted y values of mpg. It plots in essence the difference between the fitted value and the data point value for each of the fitted value. This graph shows that as the two tails of the fitted values have greater residuals than the middle section. 
+
+Normal Q-Q: 
+if the points on the qq plot line up on the dotted line, this means that that data point distribution follow the underlying distribution that was described. In our case, since the majority of the data points lie on the linear line, this supports normality. However, the tail quantiles seem to be above the theoretical line, suggesting that our data has a right skew.
+
+Scale-Location: 
+The red line is approximately horizontal, meaning the average magnitude of the standardized residuals isn’t changing much as a function of the fitted values.
+The spread around the red line doesn’t vary that much with the fitted values. Thus the variability of magnitudes don’t vary much as a function of the fitted values. These observations indicate that our model is a good fit. 
+
+
+Residuals vs Leverage:
+There's multiple parts to this graph. The first plotting leverage vs standardized residuals shows what happens to the standardized difference between fitted values and original plots as we plot the them in order deviating further and further from the mean. The spread of standardized residuals shouldn’t change as a function of leverage and here it doesn't really decrease. There is a small decrease probably due to fewer data points with high leverage. As a result, we can't conclude heteroskedasticity. 
+
+Cooks distance tells us how influential deleting a point on the combined parameter vector is. Since our solid red line does not cross any of the dotted red lines, we can conclude that none of the points can be eliminated as outliers. 
+
+## 6)
+```{r}
+sat = faraway::sat
+e = poly(sat$expend, degree=2, raw=TRUE)
+s = poly(sat$salary, degree=2, raw=TRUE)
+t = poly(sat$takers, degree=2, raw=TRUE)
+r = poly(sat$ratio, degree=2, raw=TRUE)
+mod <- lm(total ~ e + s + t + r , data = sat)
+summary(mod)
+plot(mod)
+
+```
+
+
+constant varianace: residuals vs fitted values 
+normality assumption: normality qq plot
+leverage: h hat
+outliers: dfbetas
+influence: cooksdistance
+
+a) in the residuals vs fitted plot, we see that there is no correlation and heteroskedasticity in the residual points. the tail end residuals aren't greater than the middle  ones, and as a result constant variance holds. 
+
+b) according the normal qq plot, the data seems to follow a normal distribution as the majority of points lie on the dotted line 
+
+```{r}
+infl = influence.measures(mod, infl = influence(mod))
+summary(infl)
+```
+
+c) the points with the largest leverages are California, Connecticut, New Jersey, and Utah as determined from calculated hat values. T
+
+```{r}
+dfbeta_threshold = 2/(50)^0.5
+dfbeta_threshold
+```
+d) comparing the dfbetas values with the thresh hold, the outliers are california and west virginia
+
+e) the most influential point in the dataset is west viriginia as it has the greatest cooks distance of 0.15. california is the second most influential point with a cooks distance of 0.09
+
+to improve the regression, we could try removing the data points of california and west virignia 
+
+
+## 7) 
+```{r}
+bor  = read.csv("C:/Users/kathl/Downloads/Bordeaux.csv")
+y = bor$Price
+x1 = bor$ParkerPoints
+x2 = bor$CoatesPoints
+x3 = bor$P95andAbove
+x4 = bor$FirstGrowth
+x5 = bor$CultWine
+x6 = bor$Pomerol
+x7 = bor$VintageSuperstar
+
+wreg = lm(log(y) ~ log(x1) + log(x2) + x3 + x4 + x5 + x6 + x7)
+summary(wreg)
+
+```
+b) 
+```{r}
+stdres = rstandard(wreg)
+plot(log(x1), rstandard(wreg), main = "Standard Res vs log(ParkerPoints")
+plot(log(x2), rstandard(wreg), main = "Standard res vs log(CoatesPoints)")
+```
+yes, the variability of the standard residuals is relatively constant across both quantitative predictors
+
+
+
+
+
+b2) yes
+```{r}
+boxplot(stdres, x3, x4, x5, x6, x7, horizontal = TRUE, names = c("std res","x3", "x4", "x5", "x6", "x7"))
+
+```
+c) the standard residuals do not seem to be correlated across the fitted values
+```{r}
+plot(fitted(wreg), stdres)
+```
+d) the observed log(y) values and the fitted values seem to have a 1 to 1 relationship and thus, the fit seem to be a valid model for the data
+```{r}
+plot(fitted(wreg), log(y))
+```
+e) 
+```{r}
+plot(wreg)
+```
+there does not seem to be heteroskedasticity in either the residuals vs fitted and the scale-location plots. the normal qq plot points mostly lie on the linear line, and thus the normality can be assumed. None of the cooks distance go above the 0.5 dotted line. standardized residuals do not really seem to change as leverage increases. the small decrease seen is primarily due to fewer data points with that high leverage. This all suggests that our model is a good fit for the data. 
+
+f) 
+```{r}
+summary(wreg)
+```
+Looking at the t statistics, variables x3 and x7 has a p-value > 0.05 . Dropping those two variables, the new regression model is below. 
+
+```{r}
+wreg2 = lm(formula = log(y) ~ log(x1) + log(x2) + x4 + x5 + x6)
+summary(wreg2)
+```
+for each increase in log(x1), log(y) increases by 13.6411
+
+for each increase in log(x1), log(y) increases by 1.60494
